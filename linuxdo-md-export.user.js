@@ -489,9 +489,9 @@
     ];
 
     if (exportMode === "nest") {
-      lines.push(renderNestedPosts(visiblePosts, topicInfo));
+      lines.push(renderNestedPosts(visiblePosts));
     } else {
-      lines.push(renderFlatPosts(visiblePosts, topicInfo));
+      lines.push(renderFlatPosts(visiblePosts));
     }
 
     if (skipped.length) {
@@ -501,12 +501,12 @@
     return normalizeMarkdown(lines.join("\n"));
   }
 
-  function renderFlatPosts(items, topicInfo) {
+  function renderFlatPosts(items) {
     return items.map(({ post, body }) => {
       return [
         `## #${post.post_number} ${formatAuthor(post)}`,
         "",
-        renderPostMeta(post, topicInfo),
+        renderPostMeta(post),
         "",
         body,
         "",
@@ -514,7 +514,7 @@
     }).join("\n");
   }
 
-  function renderNestedPosts(items, topicInfo) {
+  function renderNestedPosts(items) {
     const byNumber = new Map(items.map((item) => [item.post.post_number, { ...item, children: [] }]));
     const roots = [];
     const outOfRangeParents = [];
@@ -543,38 +543,36 @@
 
     const lines = [];
     for (const root of roots) {
-      renderNestedNode(root, topicInfo, 2, lines);
+      renderNestedNode(root, 2, lines);
     }
 
     if (outOfRangeParents.length) {
       lines.push("## 范围外父级回复", "");
       for (const node of outOfRangeParents) {
-        renderNestedNode(node, topicInfo, 3, lines);
+        renderNestedNode(node, 3, lines);
       }
     }
 
     return lines.join("\n");
   }
 
-  function renderNestedNode(node, topicInfo, depth, lines) {
+  function renderNestedNode(node, depth, lines) {
     const level = Math.min(depth, 6);
     lines.push(`${"#".repeat(level)} #${node.post.post_number} ${formatAuthor(node.post)}`);
     lines.push("");
-    lines.push(renderPostMeta(node.post, topicInfo));
+    lines.push(renderPostMeta(node.post));
     lines.push("");
     lines.push(node.body);
     lines.push("");
 
     for (const child of node.children) {
-      renderNestedNode(child, topicInfo, depth + 1, lines);
+      renderNestedNode(child, depth + 1, lines);
     }
   }
 
-  function renderPostMeta(post, topicInfo) {
+  function renderPostMeta(post) {
     const parts = [
-      `作者: ${formatAuthor(post)}`,
       `时间: ${formatDate(post.created_at)}`,
-      `链接: ${makePostUrl(topicInfo, post.post_number)}`,
     ];
 
     if (post.reply_to_post_number) {
@@ -593,10 +591,6 @@
     if (!value) return "";
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-  }
-
-  function makePostUrl(topicInfo, postNumber) {
-    return `${topicInfo.origin}/${topicInfo.viewToken}/topic/${topicInfo.id}/${postNumber}`;
   }
 
   function htmlToMarkdown(html) {
@@ -651,6 +645,9 @@
         return `[${escapeMarkdownLinkText(label)}](${absoluteUrl(href)})`;
       }
       case "img": {
+        const emojiText = imageToEmojiText(node);
+        if (emojiText) return emojiText;
+
         const src = node.getAttribute("src");
         if (!src) return "";
         const alt = node.getAttribute("alt") || node.getAttribute("title") || "image";
@@ -708,6 +705,51 @@
     } catch {
       return value;
     }
+  }
+
+  function imageToEmojiText(node) {
+    const src = node.getAttribute("src") || "";
+    const alt = node.getAttribute("alt") || "";
+    const title = node.getAttribute("title") || "";
+    const ariaLabel = node.getAttribute("aria-label") || "";
+    const className = node.getAttribute("class") || "";
+    const haystack = `${className} ${src} ${alt} ${title} ${ariaLabel}`.toLowerCase();
+    const looksLikeEmoji =
+      /\b(custom-)?emoji\b/.test(className.toLowerCase()) ||
+      /\bemoticon\b/.test(className.toLowerCase()) ||
+      /^:[^:\s][^:]*:$/.test(alt.trim()) ||
+      /^:[^:\s][^:]*:$/.test(title.trim()) ||
+      /^:[^:\s][^:]*:$/.test(ariaLabel.trim()) ||
+      haystack.includes("/emoji/") ||
+      haystack.includes("emoji") ||
+      haystack.includes("emoticon");
+
+    if (!looksLikeEmoji) return "";
+
+    const rawName = alt || title || ariaLabel || filenameFromUrl(src);
+    const name = cleanEmojiName(rawName);
+    return name ? `:${name}:` : "";
+  }
+
+  function filenameFromUrl(value) {
+    try {
+      const url = new URL(value, location.origin);
+      const filename = url.pathname.split("/").filter(Boolean).pop() || "";
+      return filename.replace(/\.[a-z0-9]+$/i, "");
+    } catch {
+      const filename = String(value || "").split(/[/?#]/).filter(Boolean).pop() || "";
+      return filename.replace(/\.[a-z0-9]+$/i, "");
+    }
+  }
+
+  function cleanEmojiName(value) {
+    return String(value || "")
+      .trim()
+      .replace(/^:+|:+$/g, "")
+      .replace(/\.[a-z0-9]+$/i, "")
+      .replace(/\s+/g, "_")
+      .replace(/[^\w+\-.]/g, "")
+      .replace(/^_+|_+$/g, "");
   }
 
   function escapeMarkdownLine(value) {
