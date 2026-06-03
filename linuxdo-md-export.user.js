@@ -1,9 +1,16 @@
 // ==UserScript==
-// @name         Linux.do Topic Markdown Exporter
-// @namespace    https://linux.do/
+// @name         Linux.do Export Markdown
+// @name:zh-CN   Linux.do 帖子 Markdown 导出
+// @name:en      Linux.do Export Markdown
+// @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
 // @version      1.0.0
-// @description  Export Linux.do topics to Markdown with automatic flat/nest/post mode support.
-// @author       Codex
+// @description  Export Linux.do topics to Markdown with automatic flat, nest, and main-post-only modes.
+// @description:zh-CN 将 Linux.do 论坛帖子导出为 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
+// @description:en Export Linux.do topics to Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
+// @author       kai-wei-kfuse
+// @license      MIT
+// @homepageURL  https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
+// @supportURL   https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown/issues
 // @match        https://linux.do/t/topic/*
 // @match        https://linux.do/n/topic/*
 // @match        https://www.linux.do/t/topic/*

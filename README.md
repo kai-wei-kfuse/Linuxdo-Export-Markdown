@@ -27,6 +27,18 @@
 
 ## 安装
 
+### 从 Greasy Fork 安装
+
+发布到 Greasy Fork 后，直接打开脚本页面并点击安装即可。脚本已使用 Greasy Fork 可读取的用户脚本元数据格式：
+
+- `@name` / `@name:zh-CN` / `@name:en`
+- `@description` / `@description:zh-CN` / `@description:en`
+- `@license MIT`
+- `@homepageURL`
+- `@supportURL`
+
+### 手动安装
+
 1. 安装浏览器扩展：
    - [Tampermonkey](https://www.tampermonkey.net/)
    - 或 [Violentmonkey](https://violentmonkey.github.io/)
