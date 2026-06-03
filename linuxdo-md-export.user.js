@@ -3,7 +3,7 @@
 // @name:zh-CN   Linux.do 帖子 Markdown 导出
 // @name:en      Linux.do Export Markdown
 // @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
-// @version      1.0.0
+// @version      1.0.1
 // @description  Export Linux.do topics to Markdown with automatic flat, nest, and main-post-only modes.
 // @description:zh-CN 将 Linux.do 论坛帖子导出为 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
 // @description:en Export Linux.do topics to Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
@@ -504,7 +504,7 @@
   function renderFlatPosts(items) {
     return items.map(({ post, body }) => {
       return [
-        `## #${post.post_number} ${formatAuthor(post)}`,
+        renderPostLabel(post),
         "",
         renderPostMeta(post),
         "",
@@ -557,8 +557,7 @@
   }
 
   function renderNestedNode(node, depth, lines) {
-    const level = Math.min(depth, 6);
-    lines.push(`${"#".repeat(level)} #${node.post.post_number} ${formatAuthor(node.post)}`);
+    lines.push(renderPostLabel(node.post));
     lines.push("");
     lines.push(renderPostMeta(node.post));
     lines.push("");
@@ -580,6 +579,10 @@
     }
 
     return parts.map((part) => `- ${part}`).join("\n");
+  }
+
+  function renderPostLabel(post) {
+    return `**#${post.post_number} ${formatAuthor(post)}**`;
   }
 
   function formatAuthor(post) {
@@ -640,18 +643,21 @@
       }
       case "a": {
         const href = node.getAttribute("href");
+        const singleImage = findSingleImageChild(node);
+        if (href && singleImage) {
+          const imageMarkdown = renderImageMarkdown(singleImage);
+          const src = singleImage.getAttribute("src") || "";
+          if (!imageMarkdown) return "";
+          if (urlsPointToSameResource(href, src)) return imageMarkdown;
+          return `[${imageMarkdown}](${absoluteUrl(href)})`;
+        }
+
         const label = text() || href || "";
         if (!href) return label;
         return `[${escapeMarkdownLinkText(label)}](${absoluteUrl(href)})`;
       }
       case "img": {
-        const emojiText = imageToEmojiText(node);
-        if (emojiText) return emojiText;
-
-        const src = node.getAttribute("src");
-        if (!src) return "";
-        const alt = node.getAttribute("alt") || node.getAttribute("title") || "image";
-        return `![${escapeMarkdownLinkText(alt)}](${absoluteUrl(src)})`;
+        return renderImageMarkdown(node);
       }
       case "ul":
       case "ol":
@@ -704,6 +710,43 @@
       return new URL(value, location.origin).href;
     } catch {
       return value;
+    }
+  }
+
+  function renderImageMarkdown(node) {
+    const emojiText = imageToEmojiText(node);
+    if (emojiText) return emojiText;
+
+    const src = node.getAttribute("src");
+    if (!src) return "";
+    const alt = node.getAttribute("alt") || node.getAttribute("title") || "image";
+    return `![${escapeMarkdownLinkText(alt)}](${absoluteUrl(src)})`;
+  }
+
+  function findSingleImageChild(node) {
+    const meaningfulChildren = [...node.childNodes].filter((child) => {
+      if (child.nodeType === Node.TEXT_NODE) return child.nodeValue.trim();
+      if (child.nodeType === Node.ELEMENT_NODE) return true;
+      return false;
+    });
+
+    if (meaningfulChildren.length !== 1) return null;
+
+    const onlyChild = meaningfulChildren[0];
+    if (onlyChild.nodeType === Node.ELEMENT_NODE && onlyChild.tagName.toLowerCase() === "img") {
+      return onlyChild;
+    }
+
+    return null;
+  }
+
+  function urlsPointToSameResource(first, second) {
+    if (!first || !second) return false;
+
+    try {
+      return new URL(first, location.origin).href === new URL(second, location.origin).href;
+    } catch {
+      return String(first) === String(second);
     }
   }
 

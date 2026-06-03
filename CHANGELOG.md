@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.1 - 2026-06-03
+
+### Changed
+
+- Render each exported comment label as bold text instead of a Markdown heading.
+- Collapse image links that point to the same image into plain Markdown images.
+
+### Fixed
+
+- Avoid visually noisy Markdown like `[![image](image-url)](image-url)` when the link target is the image itself.
+- Keep image links clickable only when the link target differs from the image source.
+
 ## v1.0.0 - 2026-06-03
 
 Initial public release.
