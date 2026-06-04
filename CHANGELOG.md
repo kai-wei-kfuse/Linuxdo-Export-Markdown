@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.1 - 2026-06-04
+
+### Changed
+
+- Show the Markdown not-recommended hint only when exporting comments or custom post ranges.
+- Keep the Markdown option unmarked when exporting the main post only.
+
 ## v1.1.0 - 2026-06-04
 
 ### Added

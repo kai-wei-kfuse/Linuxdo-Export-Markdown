@@ -3,7 +3,7 @@
 // @name:zh-CN   Linux.do 帖子 Markdown 导出
 // @name:en      Linux.do Export Markdown
 // @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
-// @version      1.1.0
+// @version      1.1.1
 // @description  Export Linux.do topics to HTML or Markdown with automatic flat, nest, and main-post-only modes.
 // @description:zh-CN 将 Linux.do 论坛帖子导出为 HTML 或 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
 // @description:en Export Linux.do topics to HTML or Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
@@ -212,7 +212,7 @@
 
       const formatOptions = [
         ["html", "HTML"],
-        ["markdown", "Markdown（不推荐）"],
+        ["markdown", "Markdown（导出评论不推荐）"],
       ];
 
       for (const [value, text] of formatOptions) {
@@ -221,6 +221,8 @@
         option.textContent = text;
         formatSelect.appendChild(option);
       }
+
+      const markdownOption = [...formatSelect.options].find((option) => option.value === "markdown");
 
       const label = document.createElement("label");
       label.textContent = "范围";
@@ -297,9 +299,15 @@
         const show = select.value === "custom";
         customWrap.style.display = show ? "block" : "none";
         error.textContent = "";
+        syncFormatRecommendation();
         if (show) {
           setTimeout(() => customInput.focus(), 0);
         }
+      }
+
+      function syncFormatRecommendation() {
+        if (!markdownOption) return;
+        markdownOption.textContent = select.value === "post" ? "Markdown" : "Markdown（导出评论不推荐）";
       }
 
       function confirm() {
@@ -346,6 +354,7 @@
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
 
+      syncFormatRecommendation();
       formatSelect.focus();
     });
   }

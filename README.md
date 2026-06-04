@@ -2,7 +2,7 @@
 
 一个用于将 [Linux.do](https://linux.do/) 论坛帖子导出为 HTML 或 Markdown 文件的 Tampermonkey/Violentmonkey 用户脚本。
 
-默认推荐导出为 HTML，因为它会保留论坛渲染后的评论结构和图片显示；Markdown 导出仍然可用，但在脚本中标记为“不推荐”。
+导出评论/回复时推荐使用 HTML，因为它会保留论坛渲染后的结构和图片显示；只导出主帖时，Markdown 也适合使用。
 
 脚本支持自动识别 Linux.do 的两种帖子链接模式：
 
@@ -13,7 +13,7 @@
 
 - 一键导出当前帖子为 `.html` 或 `.md` 文件
 - 默认导出完整 HTML 文件，可直接在浏览器中打开
-- 保留 Markdown 导出选项，并标注为 `Markdown（不推荐）`
+- 保留 Markdown 导出选项；导出评论/回复时会提示 `Markdown（导出评论不推荐）`
 - 自动携带浏览器登录态访问帖子 JSON 数据
 - 支持长帖补齐未加载楼层
 - 支持 flat / nest 自动识别
@@ -49,7 +49,9 @@
 弹窗中可以选择导出格式：
 
 - `HTML`：推荐，导出完整 HTML 文件。
-- `Markdown（不推荐）`：导出 Markdown 文件，适合需要纯文本 Markdown 的场景。
+- `Markdown`：导出 Markdown 文件。
+
+当导出范围为 `全部回复` 或 `自定义楼层` 时，Markdown 选项会显示为 `Markdown（导出评论不推荐）`；当选择 `只导出主帖` 时，只显示 `Markdown`。
 
 弹窗中可以选择导出范围：
 
