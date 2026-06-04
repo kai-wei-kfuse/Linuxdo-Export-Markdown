@@ -3,10 +3,10 @@
 // @name:zh-CN   Linux.do 帖子 Markdown 导出
 // @name:en      Linux.do Export Markdown
 // @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
-// @version      1.0.2
-// @description  Export Linux.do topics to Markdown with automatic flat, nest, and main-post-only modes.
-// @description:zh-CN 将 Linux.do 论坛帖子导出为 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
-// @description:en Export Linux.do topics to Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
+// @version      1.1.0
+// @description  Export Linux.do topics to HTML or Markdown with automatic flat, nest, and main-post-only modes.
+// @description:zh-CN 将 Linux.do 论坛帖子导出为 HTML 或 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
+// @description:en Export Linux.do topics to HTML or Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
 // @author       kai-wei-kfuse
 // @license      MIT
 // @homepageURL  https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
@@ -62,8 +62,8 @@
     const button = document.createElement("button");
     button.id = BUTTON_ID;
     button.type = "button";
-    button.textContent = "导出 MD";
-    button.title = "导出当前 Linux.do 帖子为 Markdown";
+    button.textContent = "导出";
+    button.title = "导出当前 Linux.do 帖子";
     button.style.cssText = [
       "position:fixed",
       "right:18px",
@@ -97,11 +97,11 @@
       throw new Error("当前页面不是可识别的 linux.do 帖子链接。");
     }
 
-    const rangeInput = await showRangeDialog();
+    const exportOptions = await showRangeDialog();
 
-    if (rangeInput === null) return;
+    if (exportOptions === null) return;
 
-    const range = parseRange(rangeInput);
+    const range = parseRange(exportOptions.rangeInput);
     const exportMode = range.kind === "post" ? "post" : topicInfo.detectedMode;
 
     setBusy(button, true);
@@ -113,16 +113,19 @@
         throw new Error("所选范围内没有可导出的楼层。");
       }
 
-      const markdown = buildMarkdown({
+      const buildOptions = {
         topic,
         topicInfo,
         posts: selectedPosts,
         exportMode,
         range,
-      });
+      };
+      const isHtml = exportOptions.outputFormat === "html";
+      const content = isHtml ? buildHtml(buildOptions) : buildMarkdown(buildOptions);
+      const mimeType = isHtml ? "text/html;charset=utf-8" : "text/markdown;charset=utf-8";
 
-      const filename = makeFilename(topicInfo.id, exportMode, topic.title);
-      downloadText(filename, markdown);
+      const filename = makeFilename(topicInfo.id, exportMode, topic.title, exportOptions.outputFormat);
+      downloadText(filename, content, mimeType);
     } finally {
       setBusy(button, false);
     }
@@ -130,7 +133,7 @@
 
   function setBusy(button, busy) {
     button.disabled = busy;
-    button.textContent = busy ? "导出中..." : "导出 MD";
+    button.textContent = busy ? "导出中..." : "导出";
     button.style.opacity = busy ? "0.72" : "1";
     button.style.cursor = busy ? "wait" : "pointer";
   }
@@ -170,7 +173,7 @@
 
       const title = document.createElement("h2");
       title.id = "linuxdo-md-export-title";
-      title.textContent = "选择导出范围";
+      title.textContent = "选择导出方式";
       title.style.cssText = [
         "margin:0 0 14px",
         "font-size:18px",
@@ -179,9 +182,7 @@
         "letter-spacing:0",
       ].join(";");
 
-      const label = document.createElement("label");
-      label.textContent = "范围";
-      label.style.cssText = [
+      const fieldLabelStyle = [
         "display:block",
         "margin:0 0 6px",
         "font-size:13px",
@@ -189,8 +190,7 @@
         "color:#334155",
       ].join(";");
 
-      const select = document.createElement("select");
-      select.style.cssText = [
+      const inputStyle = [
         "width:100%",
         "box-sizing:border-box",
         "border:1px solid #cbd5e1",
@@ -202,6 +202,32 @@
         "padding:9px 10px",
         "outline:none",
       ].join(";");
+
+      const formatLabel = document.createElement("label");
+      formatLabel.textContent = "导出格式";
+      formatLabel.style.cssText = fieldLabelStyle;
+
+      const formatSelect = document.createElement("select");
+      formatSelect.style.cssText = inputStyle;
+
+      const formatOptions = [
+        ["html", "HTML"],
+        ["markdown", "Markdown（不推荐）"],
+      ];
+
+      for (const [value, text] of formatOptions) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = text;
+        formatSelect.appendChild(option);
+      }
+
+      const label = document.createElement("label");
+      label.textContent = "范围";
+      label.style.cssText = fieldLabelStyle + ";margin-top:12px";
+
+      const select = document.createElement("select");
+      select.style.cssText = inputStyle;
 
       const options = [
         ["all", "全部回复"],
@@ -221,29 +247,12 @@
 
       const customLabel = document.createElement("label");
       customLabel.textContent = "自定义楼层";
-      customLabel.style.cssText = [
-        "display:block",
-        "margin:0 0 6px",
-        "font-size:13px",
-        "font-weight:600",
-        "color:#334155",
-      ].join(";");
+      customLabel.style.cssText = fieldLabelStyle;
 
       const customInput = document.createElement("input");
       customInput.type = "text";
       customInput.placeholder = "例如：1-50 或 1,3,8-12";
-      customInput.style.cssText = [
-        "width:100%",
-        "box-sizing:border-box",
-        "border:1px solid #cbd5e1",
-        "border-radius:6px",
-        "background:#fff",
-        "color:#0f172a",
-        "font-size:14px",
-        "line-height:1.4",
-        "padding:9px 10px",
-        "outline:none",
-      ].join(";");
+      customInput.style.cssText = inputStyle;
 
       const error = document.createElement("div");
       error.setAttribute("aria-live", "polite");
@@ -298,7 +307,7 @@
 
         try {
           parseRange(value);
-          close(value);
+          close({ rangeInput: value, outputFormat: formatSelect.value });
         } catch (parseError) {
           error.textContent = parseError.message || "范围格式无效。";
           customInput.focus();
@@ -327,6 +336,8 @@
       actions.appendChild(cancelButton);
       actions.appendChild(confirmButton);
       dialog.appendChild(title);
+      dialog.appendChild(formatLabel);
+      dialog.appendChild(formatSelect);
       dialog.appendChild(label);
       dialog.appendChild(select);
       dialog.appendChild(customWrap);
@@ -335,7 +346,7 @@
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
 
-      select.focus();
+      formatSelect.focus();
     });
   }
 
@@ -501,6 +512,57 @@
     return normalizeMarkdown(lines.join("\n"));
   }
 
+  function buildHtml({ topic, topicInfo, posts, exportMode, range }) {
+    const skipped = [];
+    const visiblePosts = [];
+
+    for (const post of posts) {
+      const body = String(post.cooked || "").trim();
+      if (!body) {
+        skipped.push(post.post_number);
+      } else {
+        visiblePosts.push({ post, body });
+      }
+    }
+
+    const content = exportMode === "nest"
+      ? renderNestedPostsHtml(visiblePosts)
+      : renderFlatPostsHtml(visiblePosts);
+
+    const skippedHtml = skipped.length
+      ? `<section class="skipped"><strong>跳过空白/不可见楼层:</strong> ${escapeHtml(skipped.join(", "))}</section>`
+      : "";
+
+    return [
+      "<!doctype html>",
+      '<html lang="zh-CN">',
+      "<head>",
+      '<meta charset="utf-8">',
+      '<meta name="viewport" content="width=device-width, initial-scale=1">',
+      `<title>${escapeHtml(topic.title)}</title>`,
+      `<style>${htmlExportCss()}</style>`,
+      "</head>",
+      "<body>",
+      '<main class="page">',
+      `<h1>${escapeHtml(topic.title)}</h1>`,
+      '<section class="topic-meta">',
+      `<div><strong>原始链接:</strong> <a href="${escapeHtmlAttribute(topicInfo.originalUrl)}">${escapeHtml(topicInfo.originalUrl)}</a></div>`,
+      `<div><strong>导出模式:</strong> ${escapeHtml(exportMode)}</div>`,
+      `<div><strong>导出格式:</strong> HTML</div>`,
+      `<div><strong>导出时间:</strong> ${escapeHtml(new Date().toLocaleString())}</div>`,
+      `<div><strong>楼层范围:</strong> ${escapeHtml(range.label || "all")}</div>`,
+      "</section>",
+      '<section class="posts">',
+      content,
+      "</section>",
+      skippedHtml,
+      "</main>",
+      "</body>",
+      "</html>",
+      "",
+    ].join("\n");
+  }
+
   function renderFlatPosts(items) {
     return items.map(({ post, body }) => {
       return [
@@ -512,6 +574,10 @@
         "",
       ].join("\n");
     }).join("\n");
+  }
+
+  function renderFlatPostsHtml(items) {
+    return items.map(({ post, body }) => renderPostHtml({ post, body, depth: 0 })).join("\n");
   }
 
   function renderNestedPosts(items) {
@@ -556,6 +622,47 @@
     return lines.join("\n");
   }
 
+  function renderNestedPostsHtml(items) {
+    const byNumber = new Map(items.map((item) => [item.post.post_number, { ...item, children: [] }]));
+    const roots = [];
+    const outOfRangeParents = [];
+    const mainPostNode = byNumber.get(1);
+
+    for (const node of byNumber.values()) {
+      const parentNumber = Number(node.post.reply_to_post_number || 0);
+      if (parentNumber && byNumber.has(parentNumber)) {
+        byNumber.get(parentNumber).children.push(node);
+      } else if (parentNumber && !byNumber.has(parentNumber)) {
+        outOfRangeParents.push(node);
+      } else if (mainPostNode && node.post.post_number !== 1) {
+        mainPostNode.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+
+    for (const node of byNumber.values()) {
+      node.children.sort((a, b) => a.post.post_number - b.post.post_number);
+    }
+
+    roots.sort((a, b) => a.post.post_number - b.post.post_number);
+    outOfRangeParents.sort((a, b) => a.post.post_number - b.post.post_number);
+
+    const html = [];
+    for (const root of roots) {
+      renderNestedNodeHtml(root, 0, html);
+    }
+
+    if (outOfRangeParents.length) {
+      html.push('<h2 class="section-title">范围外父级回复</h2>');
+      for (const node of outOfRangeParents) {
+        renderNestedNodeHtml(node, 1, html);
+      }
+    }
+
+    return html.join("\n");
+  }
+
   function renderNestedNode(node, depth, lines) {
     lines.push(renderPostLabel(node.post));
     lines.push("");
@@ -567,6 +674,35 @@
     for (const child of node.children) {
       renderNestedNode(child, depth + 1, lines);
     }
+  }
+
+  function renderNestedNodeHtml(node, depth, html) {
+    html.push(renderPostHtml({ post: node.post, body: node.body, depth }));
+
+    for (const child of node.children) {
+      renderNestedNodeHtml(child, depth + 1, html);
+    }
+  }
+
+  function renderPostHtml({ post, body, depth }) {
+    const safeDepth = Math.min(Math.max(depth, 0), 8);
+    const meta = [
+      `<span>时间: ${escapeHtml(formatDate(post.created_at))}</span>`,
+    ];
+
+    if (post.reply_to_post_number) {
+      meta.push(`<span>回复: #${escapeHtml(post.reply_to_post_number)}</span>`);
+    }
+
+    return [
+      `<article class="post depth-${safeDepth}" style="--depth:${safeDepth}">`,
+      '<header class="post-header">',
+      `<div class="post-title">#${escapeHtml(post.post_number)} ${escapeHtml(formatAuthor(post))}</div>`,
+      `<div class="post-meta">${meta.join("")}</div>`,
+      "</header>",
+      `<div class="post-body">${body}</div>`,
+      "</article>",
+    ].join("\n");
   }
 
   function renderPostMeta(post) {
@@ -841,6 +977,103 @@
     return String(value || "").replace(/]/g, "\\]").replace(/\s+/g, " ").trim();
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function escapeHtmlAttribute(value) {
+    return escapeHtml(value).replace(/`/g, "&#96;");
+  }
+
+  function htmlExportCss() {
+    return `
+      :root {
+        color-scheme: light;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f8fafc; }
+      .page { width: min(980px, calc(100vw - 32px)); margin: 32px auto; }
+      h1 { margin: 0 0 16px; font-size: 28px; line-height: 1.25; letter-spacing: 0; }
+      a { color: #0f766e; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .topic-meta {
+        display: grid;
+        gap: 6px;
+        margin: 0 0 20px;
+        padding: 14px 16px;
+        border: 1px solid #dbe3ea;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #334155;
+        font-size: 14px;
+      }
+      .posts { display: grid; gap: 12px; }
+      .post {
+        margin-left: min(calc(var(--depth) * 28px), 224px);
+        border: 1px solid #dbe3ea;
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+      }
+      .post-header {
+        display: grid;
+        gap: 6px;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      .post-title { font-weight: 700; line-height: 1.35; }
+      .post-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        color: #64748b;
+        font-size: 13px;
+      }
+      .post-body {
+        padding: 14px;
+        line-height: 1.65;
+        overflow-wrap: anywhere;
+      }
+      .post-body img {
+        max-width: 100%;
+        height: auto;
+      }
+      .post-body pre {
+        max-width: 100%;
+        overflow: auto;
+        padding: 12px;
+        border-radius: 6px;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .post-body blockquote {
+        margin: 12px 0;
+        padding: 8px 12px;
+        border-left: 3px solid #94a3b8;
+        background: #f8fafc;
+        color: #334155;
+      }
+      .section-title { margin: 22px 0 10px; font-size: 18px; letter-spacing: 0; }
+      .skipped {
+        margin-top: 20px;
+        padding: 12px 14px;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        background: #fff1f2;
+        color: #991b1b;
+      }
+    `;
+  }
+
   function normalizeMarkdown(markdown) {
     return markdown
       .replace(/[ \t]+\n/g, "\n")
@@ -849,18 +1082,19 @@
       + "\n";
   }
 
-  function makeFilename(topicId, mode, title) {
+  function makeFilename(topicId, mode, title, outputFormat) {
     const safeTitle = String(title || "topic")
       .replace(/[\\/:*?"<>|]/g, " ")
       .replace(/\s+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 80) || "topic";
 
-    return `linuxdo-${topicId}-${mode}-${safeTitle}.md`;
+    const extension = outputFormat === "html" ? "html" : "md";
+    return `linuxdo-${topicId}-${mode}-${safeTitle}.${extension}`;
   }
 
-  function downloadText(filename, text) {
-    const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  function downloadText(filename, text, mimeType) {
+    const blob = new Blob([text], { type: mimeType || "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
 
     if (typeof GM_download === "function") {
