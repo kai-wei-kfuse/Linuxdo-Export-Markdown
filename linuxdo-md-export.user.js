@@ -3,7 +3,7 @@
 // @name:zh-CN   Linux.do 帖子 Markdown 导出
 // @name:en      Linux.do Export Markdown
 // @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
-// @version      1.1.1
+// @version      1.2.0
 // @description  Export Linux.do topics to HTML or Markdown with automatic flat, nest, and main-post-only modes.
 // @description:zh-CN 将 Linux.do 论坛帖子导出为 HTML 或 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
 // @description:en Export Linux.do topics to HTML or Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
@@ -117,6 +117,7 @@
         topic,
         topicInfo,
         posts: selectedPosts,
+        allPosts: topic.posts,
         exportMode,
         range,
       };
@@ -521,9 +522,10 @@
     return normalizeMarkdown(lines.join("\n"));
   }
 
-  function buildHtml({ topic, topicInfo, posts, exportMode, range }) {
+  function buildHtml({ topic, topicInfo, posts, allPosts, exportMode, range }) {
     const skipped = [];
     const visiblePosts = [];
+    const boostMap = buildReplyBoostMap(allPosts || posts);
 
     for (const post of posts) {
       const body = String(post.cooked || "").trim();
@@ -535,8 +537,8 @@
     }
 
     const content = exportMode === "nest"
-      ? renderNestedPostsHtml(visiblePosts)
-      : renderFlatPostsHtml(visiblePosts);
+      ? renderNestedPostsHtml(visiblePosts, boostMap, topicInfo)
+      : renderFlatPostsHtml(visiblePosts, boostMap, topicInfo);
 
     const skippedHtml = skipped.length
       ? `<section class="skipped"><strong>跳过空白/不可见楼层:</strong> ${escapeHtml(skipped.join(", "))}</section>`
@@ -585,8 +587,8 @@
     }).join("\n");
   }
 
-  function renderFlatPostsHtml(items) {
-    return items.map(({ post, body }) => renderPostHtml({ post, body, depth: 0 })).join("\n");
+  function renderFlatPostsHtml(items, boostMap, topicInfo) {
+    return items.map(({ post, body }) => renderPostHtml({ post, body, depth: 0, boostMap, topicInfo })).join("\n");
   }
 
   function renderNestedPosts(items) {
@@ -631,7 +633,7 @@
     return lines.join("\n");
   }
 
-  function renderNestedPostsHtml(items) {
+  function renderNestedPostsHtml(items, boostMap, topicInfo) {
     const byNumber = new Map(items.map((item) => [item.post.post_number, { ...item, children: [] }]));
     const roots = [];
     const outOfRangeParents = [];
@@ -659,13 +661,13 @@
 
     const html = [];
     for (const root of roots) {
-      renderNestedNodeHtml(root, 0, html);
+      renderNestedNodeHtml(root, 0, html, boostMap, topicInfo);
     }
 
     if (outOfRangeParents.length) {
       html.push('<h2 class="section-title">范围外父级回复</h2>');
       for (const node of outOfRangeParents) {
-        renderNestedNodeHtml(node, 1, html);
+        renderNestedNodeHtml(node, 1, html, boostMap, topicInfo);
       }
     }
 
@@ -685,15 +687,15 @@
     }
   }
 
-  function renderNestedNodeHtml(node, depth, html) {
-    html.push(renderPostHtml({ post: node.post, body: node.body, depth }));
+  function renderNestedNodeHtml(node, depth, html, boostMap, topicInfo) {
+    html.push(renderPostHtml({ post: node.post, body: node.body, depth, boostMap, topicInfo }));
 
     for (const child of node.children) {
-      renderNestedNodeHtml(child, depth + 1, html);
+      renderNestedNodeHtml(child, depth + 1, html, boostMap, topicInfo);
     }
   }
 
-  function renderPostHtml({ post, body, depth }) {
+  function renderPostHtml({ post, body, depth, boostMap, topicInfo }) {
     const safeDepth = Math.min(Math.max(depth, 0), 8);
     const meta = [
       `<span>时间: ${escapeHtml(formatDate(post.created_at))}</span>`,
@@ -710,8 +712,70 @@
       `<div class="post-meta">${meta.join("")}</div>`,
       "</header>",
       `<div class="post-body">${body}</div>`,
+      renderBoostsHtml(post, boostMap, topicInfo),
       "</article>",
     ].join("\n");
+  }
+
+  function buildReplyBoostMap(posts) {
+    const map = new Map();
+    const sortedPosts = [...(posts || [])].sort((a, b) => a.post_number - b.post_number);
+
+    for (const post of sortedPosts) {
+      const parentNumber = Number(post?.reply_to_post_number || 0);
+      if (!parentNumber || !post?.post_number) continue;
+      if (!map.has(parentNumber)) map.set(parentNumber, []);
+      map.get(parentNumber).push(post);
+    }
+
+    return map;
+  }
+
+  function renderBoostsHtml(post, boostMap, topicInfo) {
+    const replies = boostMap?.get(post.post_number) || [];
+    if (!replies.length) return "";
+
+    return [
+      '<div class="post-boosts" aria-label="直接回复摘要">',
+      ...replies.map((replyPost) => renderBoostPillHtml(replyPost, topicInfo)),
+      "</div>",
+    ].join("\n");
+  }
+
+  function renderBoostPillHtml(replyPost, topicInfo) {
+    const avatarUrl = avatarUrlFromTemplate(replyPost.avatar_template, 48, topicInfo?.origin || location.origin);
+    const avatar = avatarUrl
+      ? `<img class="boost-avatar" src="${escapeHtmlAttribute(avatarUrl)}" alt="${escapeHtmlAttribute(formatAuthor(replyPost))}">`
+      : "";
+    const excerpt = postExcerptFromCooked(replyPost.cooked || "", 34);
+
+    return [
+      '<div class="boost-pill">',
+      avatar,
+      `<span class="boost-text">${escapeHtml(excerpt || `#${replyPost.post_number}`)}</span>`,
+      "</div>",
+    ].join("");
+  }
+
+  function postExcerptFromCooked(cooked, maxLength) {
+    const doc = new DOMParser().parseFromString(`<div>${cooked || ""}</div>`, "text/html");
+    const text = String(doc.body.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength).trim()}...`;
+  }
+
+  function avatarUrlFromTemplate(template, size, origin) {
+    if (!template) return "";
+    const path = String(template).replace(/\{size\}/g, String(size));
+
+    try {
+      return new URL(path, origin || location.origin).href;
+    } catch {
+      return "";
+    }
   }
 
   function renderPostMeta(post) {
@@ -1070,6 +1134,37 @@
         border-left: 3px solid #94a3b8;
         background: #f8fafc;
         color: #334155;
+      }
+      .post-boosts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0 14px 14px;
+      }
+      .boost-pill {
+        display: inline-flex;
+        align-items: center;
+        max-width: min(360px, 100%);
+        gap: 7px;
+        padding: 6px 10px 6px 6px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #334155;
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      .boost-avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        flex: 0 0 auto;
+      }
+      .boost-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .section-title { margin: 22px 0 10px; font-size: 18px; letter-spacing: 0; }
       .skipped {
