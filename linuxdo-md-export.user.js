@@ -525,7 +525,7 @@
   function buildHtml({ topic, topicInfo, posts, allPosts, exportMode, range }) {
     const skipped = [];
     const visiblePosts = [];
-    const boostMap = buildReplyBoostMap(allPosts || posts);
+    const boostMap = scanRenderedBoosts(allPosts || posts, topicInfo);
 
     for (const post of posts) {
       const body = String(post.cooked || "").trim();
@@ -717,65 +717,128 @@
     ].join("\n");
   }
 
-  function buildReplyBoostMap(posts) {
+  function scanRenderedBoosts(posts, topicInfo) {
     const map = new Map();
-    const sortedPosts = [...(posts || [])].sort((a, b) => a.post_number - b.post_number);
+    const postNumberById = new Map();
 
-    for (const post of sortedPosts) {
-      const parentNumber = Number(post?.reply_to_post_number || 0);
-      if (!parentNumber || !post?.post_number) continue;
-      if (!map.has(parentNumber)) map.set(parentNumber, []);
-      map.get(parentNumber).push(post);
+    for (const post of posts || []) {
+      if (post?.id && post?.post_number) {
+        postNumberById.set(String(post.id), post.post_number);
+      }
+    }
+
+    const articles = [
+      ...new Set([...document.querySelectorAll(".discourse-boosts__bubble")]
+        .map((bubble) => bubble.closest("article"))
+        .filter(Boolean)),
+    ];
+
+    for (const article of articles) {
+      const postNumber = postNumberFromArticle(article, postNumberById);
+      if (!postNumber) continue;
+
+      const bubbles = [...article.querySelectorAll(".discourse-boosts__bubble")];
+      if (!bubbles.length) continue;
+
+      const boosts = bubbles
+        .map((bubble) => boostFromBubble(bubble, topicInfo))
+        .filter((boost) => boost.text || boost.username || boost.avatarUrl);
+
+      if (boosts.length) {
+        map.set(postNumber, boosts);
+      }
     }
 
     return map;
   }
 
+  function postNumberFromArticle(article, postNumberById) {
+    const dataPostId = article.getAttribute("data-post-id") || article.dataset?.postId;
+    if (dataPostId && postNumberById.has(String(dataPostId))) {
+      return postNumberById.get(String(dataPostId));
+    }
+
+    const articleId = article.id || "";
+    const idMatch = articleId.match(/^post_(\d+)$/);
+    if (idMatch && postNumberById.has(idMatch[1])) {
+      return postNumberById.get(idMatch[1]);
+    }
+
+    const postNumberAttr = article.getAttribute("data-post-number") || article.dataset?.postNumber;
+    if (/^\d+$/.test(postNumberAttr || "")) {
+      return Number(postNumberAttr);
+    }
+
+    const postLink = article.querySelector('a[href*="/topic/"], a[href*="/t/"]');
+    const hrefNumber = postLink?.getAttribute("href")?.match(/\/(\d+)(?:[?#].*)?$/)?.[1];
+    return hrefNumber ? Number(hrefNumber) : 0;
+  }
+
+  function boostFromBubble(bubble, topicInfo) {
+    const avatar = bubble.querySelector("img");
+    const avatarUrl = avatar?.getAttribute("src")
+      ? absoluteUrlWithOrigin(avatar.getAttribute("src"), topicInfo?.origin || location.origin)
+      : "";
+    const username = usernameFromBoostBubble(bubble);
+    const text = boostTextFromBubble(bubble, username);
+
+    return { avatarUrl, username, text };
+  }
+
+  function usernameFromBoostBubble(bubble) {
+    const userCard = bubble.querySelector("a[data-user-card]")?.getAttribute("data-user-card") || "";
+    if (userCard.trim()) return userCard.trim();
+
+    const userHref = bubble.querySelector('a[href^="/u/"]')?.getAttribute("href") || "";
+    const hrefName = userHref.split("/u/")[1]?.split(/[/?#]/)[0] || "";
+    return decodeURIComponent(hrefName).trim();
+  }
+
+  function boostTextFromBubble(bubble, username) {
+    const clone = bubble.cloneNode(true);
+
+    for (const element of clone.querySelectorAll("img, svg, .d-icon, .svg-icon, button")) {
+      element.remove();
+    }
+
+    let text = String(clone.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (username) {
+      text = text
+        .replace(new RegExp(`^${escapeRegExp(username)}\\b\\s*`, "i"), "")
+        .replace(new RegExp(`@${escapeRegExp(username)}\\b\\s*`, "i"), "")
+        .trim();
+    }
+
+    return text;
+  }
+
   function renderBoostsHtml(post, boostMap, topicInfo) {
-    const replies = boostMap?.get(post.post_number) || [];
-    if (!replies.length) return "";
+    const boosts = boostMap?.get(post.post_number) || [];
+    if (!boosts.length) return "";
 
     return [
       '<div class="post-boosts" aria-label="直接回复摘要">',
-      ...replies.map((replyPost) => renderBoostPillHtml(replyPost, topicInfo)),
+      ...boosts.map((boost) => renderBoostPillHtml(boost)),
       "</div>",
     ].join("\n");
   }
 
-  function renderBoostPillHtml(replyPost, topicInfo) {
-    const avatarUrl = avatarUrlFromTemplate(replyPost.avatar_template, 48, topicInfo?.origin || location.origin);
-    const avatar = avatarUrl
-      ? `<img class="boost-avatar" src="${escapeHtmlAttribute(avatarUrl)}" alt="${escapeHtmlAttribute(formatAuthor(replyPost))}">`
+  function renderBoostPillHtml(boost) {
+    const label = boost.username || "boost";
+    const avatar = boost.avatarUrl
+      ? `<img class="boost-avatar" src="${escapeHtmlAttribute(boost.avatarUrl)}" alt="${escapeHtmlAttribute(label)}">`
       : "";
-    const excerpt = postExcerptFromCooked(replyPost.cooked || "", 34);
+    const text = boost.text || boost.username || "";
 
     return [
       '<div class="boost-pill">',
       avatar,
-      `<span class="boost-text">${escapeHtml(excerpt || `#${replyPost.post_number}`)}</span>`,
+      `<span class="boost-text">${escapeHtml(text)}</span>`,
       "</div>",
     ].join("");
-  }
-
-  function postExcerptFromCooked(cooked, maxLength) {
-    const doc = new DOMParser().parseFromString(`<div>${cooked || ""}</div>`, "text/html");
-    const text = String(doc.body.textContent || "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    if (text.length <= maxLength) return text;
-    return `${text.slice(0, maxLength).trim()}...`;
-  }
-
-  function avatarUrlFromTemplate(template, size, origin) {
-    if (!template) return "";
-    const path = String(template).replace(/\{size\}/g, String(size));
-
-    try {
-      return new URL(path, origin || location.origin).href;
-    } catch {
-      return "";
-    }
   }
 
   function renderPostMeta(post) {
@@ -927,6 +990,14 @@
     }
   }
 
+  function absoluteUrlWithOrigin(value, origin) {
+    try {
+      return new URL(value, origin || location.origin).href;
+    } catch {
+      return value;
+    }
+  }
+
   function renderImageMarkdown(node, preferredSrc) {
     const emojiText = imageToEmojiText(node);
     if (emojiText) return emojiText;
@@ -1048,6 +1119,10 @@
 
   function escapeMarkdownLinkText(value) {
     return String(value || "").replace(/]/g, "\\]").replace(/\s+/g, " ").trim();
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
   function escapeHtml(value) {

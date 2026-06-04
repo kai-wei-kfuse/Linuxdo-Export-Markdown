@@ -5,7 +5,7 @@
 ### Added
 
 - Add boost / direct reply summaries to HTML exports.
-- Build boost summaries from the full topic data so main-post-only HTML exports can still show boosts.
+- Read real rendered Boost bubbles from the current Linux.do page instead of inferring them from reply relationships.
 
 ## v1.1.1 - 2026-06-04
 
