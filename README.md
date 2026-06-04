@@ -1,6 +1,8 @@
 # Linuxdo Export Markdown
 
-一个用于将 [Linux.do](https://linux.do/) 论坛帖子导出为 Markdown 文件的 Tampermonkey/Violentmonkey 用户脚本。
+一个用于将 [Linux.do](https://linux.do/) 论坛帖子导出为 HTML 或 Markdown 文件的 Tampermonkey/Violentmonkey 用户脚本。
+
+默认推荐导出为 HTML，因为它会保留论坛渲染后的评论结构和图片显示；Markdown 导出仍然可用，但在脚本中标记为“不推荐”。
 
 脚本支持自动识别 Linux.do 的两种帖子链接模式：
 
@@ -9,14 +11,17 @@
 
 ## 功能
 
-- 一键导出当前帖子为 `.md` 文件
+- 一键导出当前帖子为 `.html` 或 `.md` 文件
+- 默认导出完整 HTML 文件，可直接在浏览器中打开
+- 保留 Markdown 导出选项，并标注为 `Markdown（不推荐）`
 - 自动携带浏览器登录态访问帖子 JSON 数据
 - 支持长帖补齐未加载楼层
 - 支持 flat / nest 自动识别
 - 支持只导出主帖
 - 支持按楼层范围导出
+- 修复 Linux.do 图片附件导出时的异常 Markdown 括号格式
 - 内置轻量 HTML 转 Markdown，不依赖外部 CDN
-- 保留常见内容格式：
+- HTML 导出保留论坛渲染后的正文；Markdown 导出尽量保留常见内容格式：
   - 链接
   - 图片
   - 引用
@@ -39,7 +44,12 @@
 
 ## 使用
 
-进入 Linux.do 帖子页面后，点击右下角的 `导出 MD`。
+进入 Linux.do 帖子页面后，点击右下角的 `导出`。
+
+弹窗中可以选择导出格式：
+
+- `HTML`：推荐，导出完整 HTML 文件。
+- `Markdown（不推荐）`：导出 Markdown 文件，适合需要纯文本 Markdown 的场景。
 
 弹窗中可以选择导出范围：
 
@@ -52,7 +62,7 @@
 导出的文件名格式：
 
 ```text
-linuxdo-{topicId}-{flat|nest|post}-{title}.md
+linuxdo-{topicId}-{flat|nest|post}-{title}.{html|md}
 ```
 
 ## 导出模式
@@ -62,10 +72,10 @@ linuxdo-{topicId}-{flat|nest|post}-{title}.md
 当链接为 `/t/topic/{id}` 时，脚本按楼层顺序导出：
 
 ```markdown
-## #1 作者
+**#1 作者**
 正文
 
-## #2 作者
+**#2 作者**
 正文
 ```
 
@@ -74,10 +84,10 @@ linuxdo-{topicId}-{flat|nest|post}-{title}.md
 当链接为 `/n/topic/{id}` 时，脚本会根据 `reply_to_post_number` 生成回复树：
 
 ```markdown
-## #1 楼主
+**#1 楼主**
 正文
 
-### #2 回复者
+**#2 回复者**
 回复正文
 ```
 
@@ -89,6 +99,7 @@ linuxdo-{topicId}-{flat|nest|post}-{title}.md
 
 - 需要在浏览器中登录 Linux.do，才能导出登录后可见的内容。
 - 如果帖子内容无权限访问、被删除或隐藏，对应楼层可能会被跳过。
+- HTML 导出会直接使用论坛返回的渲染后正文，通常比 Markdown 更适合保存评论内容。
 - Markdown 转换器是内置轻量实现，目标是可读和便携，不保证 100% 复刻论坛页面渲染。
 
 ## License
