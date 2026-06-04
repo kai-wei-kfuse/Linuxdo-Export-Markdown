@@ -3,7 +3,7 @@
 // @name:zh-CN   Linux.do 帖子 Markdown 导出
 // @name:en      Linux.do Export Markdown
 // @namespace    https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown
-// @version      1.0.1
+// @version      1.0.2
 // @description  Export Linux.do topics to Markdown with automatic flat, nest, and main-post-only modes.
 // @description:zh-CN 将 Linux.do 论坛帖子导出为 Markdown，自动识别 flat/nest 模式，并支持只导出主帖或指定楼层。
 // @description:en Export Linux.do topics to Markdown with automatic flat/nest detection, main-post-only export, and post range selection.
@@ -643,16 +643,21 @@
       }
       case "a": {
         const href = node.getAttribute("href");
-        const singleImage = findSingleImageChild(node);
-        if (href && singleImage) {
-          const imageMarkdown = renderImageMarkdown(singleImage);
-          const src = singleImage.getAttribute("src") || "";
+        const linkedImage = findLinkedImageAttachment(node);
+        if (href && linkedImage) {
+          const emojiText = imageToEmojiText(linkedImage);
+          if (emojiText) return emojiText;
+
+          const hrefIsImage = isImageUrl(href);
+          const imageMarkdown = renderImageMarkdown(linkedImage, hrefIsImage ? href : null);
           if (!imageMarkdown) return "";
-          if (urlsPointToSameResource(href, src)) return imageMarkdown;
+
+          const src = linkedImage.getAttribute("src") || "";
+          if (urlsPointToSameResource(href, src) || hrefIsImage) return imageMarkdown;
           return `[${imageMarkdown}](${absoluteUrl(href)})`;
         }
 
-        const label = text() || href || "";
+        const label = plainTextContent(node) || href || "";
         if (!href) return label;
         return `[${escapeMarkdownLinkText(label)}](${absoluteUrl(href)})`;
       }
@@ -713,31 +718,64 @@
     }
   }
 
-  function renderImageMarkdown(node) {
+  function renderImageMarkdown(node, preferredSrc) {
     const emojiText = imageToEmojiText(node);
     if (emojiText) return emojiText;
 
-    const src = node.getAttribute("src");
+    const src = preferredSrc || node.getAttribute("src");
     if (!src) return "";
     const alt = node.getAttribute("alt") || node.getAttribute("title") || "image";
     return `![${escapeMarkdownLinkText(alt)}](${absoluteUrl(src)})`;
   }
 
-  function findSingleImageChild(node) {
+  function findLinkedImageAttachment(node) {
     const meaningfulChildren = [...node.childNodes].filter((child) => {
       if (child.nodeType === Node.TEXT_NODE) return child.nodeValue.trim();
       if (child.nodeType === Node.ELEMENT_NODE) return true;
       return false;
     });
 
-    if (meaningfulChildren.length !== 1) return null;
+    const imageChildren = meaningfulChildren.filter((child) => {
+      return child.nodeType === Node.ELEMENT_NODE && child.tagName.toLowerCase() === "img";
+    });
 
-    const onlyChild = meaningfulChildren[0];
-    if (onlyChild.nodeType === Node.ELEMENT_NODE && onlyChild.tagName.toLowerCase() === "img") {
-      return onlyChild;
+    if (imageChildren.length !== 1) return null;
+
+    const onlyImage = imageChildren[0];
+    const nonImageText = meaningfulChildren
+      .filter((child) => child !== onlyImage)
+      .map((child) => plainTextContent(child))
+      .join(" ")
+      .trim();
+
+    if (!nonImageText || looksLikeImageAttachmentInfo(nonImageText)) {
+      return onlyImage;
     }
 
     return null;
+  }
+
+  function looksLikeImageAttachmentInfo(value) {
+    const normalized = String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!normalized) return true;
+
+    return /^(?:image|图片)?\s*\d+\s*[x×]\s*\d+(?:\s+\d+(?:\.\d+)?\s*(?:KB|MB|B))?$/i.test(normalized);
+  }
+
+  function plainTextContent(node) {
+    return String(node?.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  function isImageUrl(value) {
+    try {
+      const url = new URL(value, location.origin);
+      return /\.(?:apng|avif|gif|jpe?g|png|svg|webp)(?:$|\?)/i.test(url.pathname);
+    } catch {
+      return /\.(?:apng|avif|gif|jpe?g|png|svg|webp)(?:$|\?)/i.test(String(value || ""));
+    }
   }
 
   function urlsPointToSameResource(first, second) {

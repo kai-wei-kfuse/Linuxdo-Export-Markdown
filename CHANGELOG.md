@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.2 - 2026-06-04
+
+### Fixed
+
+- Fix Linux.do image attachment exports that included broken nested Markdown brackets.
+- Export image attachment links as plain Markdown images and prefer the original image URL when available.
+
 ## v1.0.1 - 2026-06-03
 
 ### Changed
