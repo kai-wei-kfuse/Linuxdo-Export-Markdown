@@ -26,26 +26,16 @@
   - 粗体 / 斜体
 
 ## 安装
-
-### 从 Greasy Fork 安装
-
-发布到 Greasy Fork 后，直接打开脚本页面并点击安装即可。脚本已使用 Greasy Fork 可读取的用户脚本元数据格式：
-
-- `@name` / `@name:zh-CN` / `@name:en`
-- `@description` / `@description:zh-CN` / `@description:en`
-- `@license MIT`
-- `@homepageURL`
-- `@supportURL`
-
-### 手动安装
-
-1. 安装浏览器扩展：
-   - [Tampermonkey](https://www.tampermonkey.net/)
-   - 或 [Violentmonkey](https://violentmonkey.github.io/)
-2. 打开本仓库中的脚本文件：
-   - [`linuxdo-md-export.user.js`](./linuxdo-md-export.user.js)
-3. 将脚本内容复制到油猴中新建脚本并保存。
-4. 打开 Linux.do 帖子页面，右下角会出现 `导出 MD` 按钮。
+1. 安装 Tampermonkey、Violentmonkey 或其他用户脚本管理器。
+    - Tampermonkey:
+  
+      [<img alt="Available in the Chrome Web Store" src="https://developer.chrome.com/static/docs/webstore/branding/image/iNEddTyWiMfLSwFD6qGq.png" height="48">](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) 
+      [<img alt="Get it from Microsoft Edge Add-ons" src="https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/add-ons-badge-images/microsoft-edge-add-ons-badge.png" height="48">](https://microsoftedge.microsoft.com/addons/detail/%E7%AF%A1%E6%94%B9%E7%8C%B4/iikmkjmpaadaobahmlepeloendndfphd)
+    - ScriptCat:
+  
+       [<img alt="Available in the Chrome Web Store" src="https://developer.chrome.com/static/docs/webstore/branding/image/iNEddTyWiMfLSwFD6qGq.png" height="48">](https://chrome.google.com/webstore/detail/scriptcat/ndcooeababalnlpkfedmmbbbgkljhpjf)
+      [<img alt="Get it from Microsoft Edge Add-ons" src="https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/add-ons-badge-images/microsoft-edge-add-ons-badge.png" height="48">](https://microsoftedge.microsoft.com/addons/detail/scriptcat/liilgpjgabokdklappibcjfablkpcekh)
+2. 点击安装本仓库源码 [Linuxdo-Export-Markdown.user.js](https://github.com/kai-wei-kfuse/Linuxdo-Export-Markdown/raw/refs/heads/master/linuxdo-md-export.user.js)，或直接前往[Greasy Fork](https://greasyfork.org/zh-CN/scripts/580935-linux-do-export-markdown)安装
 
 ## 使用
 
