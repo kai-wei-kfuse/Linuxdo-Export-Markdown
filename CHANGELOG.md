@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.0 - 2026-06-04
+
+### Added
+
+- Add complete HTML export as the recommended default export format.
+- Add an export format selector with `HTML` and `Markdown（不推荐）` options.
+
+### Changed
+
+- Rename the floating export button from `导出 MD` to `导出`.
+- Keep Markdown export available for users who still want plain Markdown output.
+
 ## v1.0.2 - 2026-06-04
 
 ### Fixed
